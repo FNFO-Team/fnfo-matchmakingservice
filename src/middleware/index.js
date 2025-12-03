@@ -10,6 +10,13 @@ const {
   playerIdValidation,
   leaveMatchmakingValidation,
 } = require('./validation');
+const {
+  generalLimiter,
+  matchmakingLimiter,
+  queryLimiter,
+  adminLimiter,
+} = require('./rateLimiter');
+const { socketRateLimiter, createSocketRateLimitMiddleware } = require('./socketRateLimiter');
 
 module.exports = {
   notFoundHandler,
@@ -20,4 +27,10 @@ module.exports = {
   roomIdValidation,
   playerIdValidation,
   leaveMatchmakingValidation,
+  generalLimiter,
+  matchmakingLimiter,
+  queryLimiter,
+  adminLimiter,
+  socketRateLimiter,
+  createSocketRateLimitMiddleware,
 };

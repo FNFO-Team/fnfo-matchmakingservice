@@ -39,6 +39,14 @@ const config = {
     minPlayersForRoom: parseInt(process.env.MIN_PLAYERS_FOR_ROOM, 10) || 2,
   },
 
+  // Configuración de rate limiting
+  rateLimit: {
+    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS, 10) || 15 * 60 * 1000, // 15 minutos
+    maxRequests: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS, 10) || 100,
+    matchmakingWindowMs: parseInt(process.env.MATCHMAKING_RATE_WINDOW_MS, 10) || 60 * 1000, // 1 minuto
+    matchmakingMaxRequests: parseInt(process.env.MATCHMAKING_RATE_MAX_REQUESTS, 10) || 10,
+  },
+
   // Configuración de logging
   logging: {
     level: process.env.LOG_LEVEL || 'info',

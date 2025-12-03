@@ -12,6 +12,9 @@ const {
   roomIdValidation,
   playerIdValidation,
   leaveMatchmakingValidation,
+  matchmakingLimiter,
+  queryLimiter,
+  adminLimiter,
 } = require('../middleware');
 const logger = require('../config/logger');
 
@@ -20,6 +23,7 @@ const router = express.Router();
 // POST /matchmaking/join
 router.post(
   '/join',
+  matchmakingLimiter,
   joinMatchmakingValidation,
   asyncHandler(async (req, res) => {
     const { playerId, mode } = req.body;
@@ -33,6 +37,7 @@ router.post(
 // POST /matchmaking/leave
 router.post(
   '/leave',
+  matchmakingLimiter,
   leaveMatchmakingValidation,
   asyncHandler(async (req, res) => {
     const { playerId, mode } = req.body;
@@ -51,6 +56,7 @@ router.post(
 // GET /matchmaking/status/:playerId
 router.get(
   '/status/:playerId',
+  queryLimiter,
   playerIdValidation,
   asyncHandler(async (req, res) => {
     const { playerId } = req.params;
@@ -62,6 +68,7 @@ router.get(
 // GET /matchmaking/queue/:mode
 router.get(
   '/queue/:mode',
+  queryLimiter,
   asyncHandler(async (req, res) => {
     const { mode } = req.params;
     const gameMode = getGameModeByName(mode.toUpperCase());
@@ -85,6 +92,7 @@ router.get(
 // GET /matchmaking/stats
 router.get(
   '/stats',
+  queryLimiter,
   asyncHandler(async (req, res) => {
     const stats = await matchmakingService.getStats();
     res.status(200).json(stats);
@@ -94,6 +102,7 @@ router.get(
 // GET /matchmaking/rooms
 router.get(
   '/rooms',
+  queryLimiter,
   asyncHandler(async (req, res) => {
     const { mode, status } = req.query;
     let rooms;
@@ -117,6 +126,7 @@ router.get(
 // GET /matchmaking/rooms/:roomId
 router.get(
   '/rooms/:roomId',
+  queryLimiter,
   roomIdValidation,
   asyncHandler(async (req, res) => {
     const { roomId } = req.params;
@@ -129,6 +139,7 @@ router.get(
 // POST /matchmaking/rooms/:roomId/start
 router.post(
   '/rooms/:roomId/start',
+  adminLimiter,
   roomIdValidation,
   asyncHandler(async (req, res) => {
     const { roomId } = req.params;
@@ -154,6 +165,7 @@ router.post(
 // POST /matchmaking/rooms/:roomId/finish
 router.post(
   '/rooms/:roomId/finish',
+  adminLimiter,
   roomIdValidation,
   asyncHandler(async (req, res) => {
     const { roomId } = req.params;
@@ -170,6 +182,7 @@ router.post(
 // DELETE /matchmaking/rooms/:roomId
 router.delete(
   '/rooms/:roomId',
+  adminLimiter,
   roomIdValidation,
   asyncHandler(async (req, res) => {
     const { roomId } = req.params;

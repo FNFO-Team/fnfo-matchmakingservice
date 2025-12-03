@@ -6,6 +6,7 @@ const { Server } = require('socket.io');
 const { getRedisClient, getRedisSubscriber } = require('./redis');
 const config = require('./index');
 const logger = require('./logger');
+const { socketRateLimiter } = require('../middleware');
 
 let io = null;
 
@@ -75,6 +76,15 @@ const handleConnection = (socket) => {
 
   // Evento: join-matchmaking
   socket.on('join-matchmaking', async (data) => {
+    // Rate limiting: máximo 5 intentos por minuto
+    if (!socketRateLimiter.checkLimit(playerId, 'join-matchmaking', 5, 60000)) {
+      socket.emit('rate-limit-error', {
+        error: 'SOCKET_RATE_LIMIT',
+        message: 'Estás intentando unirte a matchmaking demasiado rápido.',
+      });
+      return;
+    }
+
     try {
       const { matchmakingService } = require('../services');
       const { getGameModeByName } = require('../domain');
@@ -118,6 +128,15 @@ const handleConnection = (socket) => {
 
   // Evento: leave-matchmaking
   socket.on('leave-matchmaking', async (data) => {
+    // Rate limiting: máximo 5 intentos por minuto
+    if (!socketRateLimiter.checkLimit(playerId, 'leave-matchmaking', 5, 60000)) {
+      socket.emit('rate-limit-error', {
+        error: 'SOCKET_RATE_LIMIT',
+        message: 'Estás intentando salir de matchmaking demasiado rápido.',
+      });
+      return;
+    }
+
     try {
       const { matchmakingService } = require('../services');
       const { getGameModeByName } = require('../domain');
@@ -159,6 +178,11 @@ const handleConnection = (socket) => {
 
   // Evento: get-queue-info
   socket.on('get-queue-info', async () => {
+    // Rate limiting: máximo 20 consultas por minuto
+    if (!socketRateLimiter.checkLimit(playerId, 'get-queue-info', 20, 60000)) {
+      return;
+    }
+
     try {
       const { matchmakingService } = require('../services');
       const stats = await matchmakingService.getStats();
@@ -243,6 +267,9 @@ const handleConnection = (socket) => {
   // Desconexión
   socket.on('disconnect', async (reason) => {
     logger.info(`Cliente desconectado: ${playerId} (${reason})`);
+
+    // Limpiar rate limits del jugador
+    socketRateLimiter.reset(playerId);
 
     try {
       const { matchmakingService, roomService } = require('../services');

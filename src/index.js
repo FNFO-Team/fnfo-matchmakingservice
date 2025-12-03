@@ -13,8 +13,9 @@ const logger = require('./config/logger');
 const { getRedisClient, closeConnections, healthCheck } = require('./config/redis');
 const { initializeSocketIO } = require('./config/socketio');
 const { matchmakingController, healthController } = require('./controllers');
-const { notFoundHandler, errorHandler } = require('./middleware');
+const { notFoundHandler, errorHandler, generalLimiter } = require('./middleware');
 const matchmakingScheduler = require('./schedulers/MatchmakingScheduler');
+const cleanupScheduler = require('./schedulers/CleanupScheduler');
 
 const createApp = () => {
   const app = express();
@@ -31,6 +32,9 @@ const createApp = () => {
   app.use(morgan('combined', {
     stream: { write: (message) => logger.info(message.trim()) },
   }));
+
+  // Rate limiting global
+  app.use(generalLimiter);
 
   // Rutas
   app.use('/health', healthController);
@@ -74,6 +78,10 @@ const startServer = async () => {
     matchmakingScheduler.start();
     logger.info('✅ Scheduler iniciado');
 
+    logger.info('Iniciando scheduler de limpieza...');
+    cleanupScheduler.start();
+    logger.info('✅ Scheduler de limpieza iniciado');
+
     const port = config.server.port;
     server.listen(port, () => {
       logger.info('='.repeat(50));
@@ -87,6 +95,7 @@ const startServer = async () => {
     const gracefulShutdown = async (signal) => {
       logger.info(`\n${signal} recibido. Iniciando cierre graceful...`);
       matchmakingScheduler.stop();
+      cleanupScheduler.stop();
       server.close(() => logger.info('Servidor HTTP cerrado'));
       await closeConnections();
       logger.info('Cierre graceful completado');
