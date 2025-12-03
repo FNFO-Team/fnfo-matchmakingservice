@@ -6,18 +6,13 @@ Matchmaking microservice for FNFO (Friday Night Funkin’ Online) — manages ro
 
 1. verificar redis
 
-docker run -d -p 6379:6379 --name redis redis:7-alpine
+    ```docker run -d -p 6379:6379 --name redis redis:7-alpine```
 
-Verificar si ya está corriendo
+- Verificar si ya está corriendo
 
-docker ps | grep redis
+    ```docker ps | grep redis```
 
 2. Iniciar el servicio
 
-npm run dev
+    ```npm run dev```
 
-### Probar 
-
-http://localhost:8080/matchmaking/health
-
-![alt text](img/image.png)
