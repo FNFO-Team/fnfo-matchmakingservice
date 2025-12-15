@@ -34,7 +34,7 @@ const config = {
     statsLogInterval: parseInt(process.env.STATS_LOG_INTERVAL, 10) || 10000,
     queueExpiryMinutes: parseInt(process.env.QUEUE_EXPIRY_MINUTES, 10) || 30,
     roomExpiryHours: parseInt(process.env.ROOM_EXPIRY_HOURS, 10) || 2,
-    maxPlayersPvp: parseInt(process.env.MAX_PLAYERS_PVP, 10) || 2,
+    maxPlayersPvp: parseInt(process.env.MAX_PLAYERS_PVP, 10) || 4,
     maxPlayersBoss: parseInt(process.env.MAX_PLAYERS_BOSS, 10) || 4,
     minPlayersForRoom: parseInt(process.env.MIN_PLAYERS_FOR_ROOM, 10) || 2,
   },

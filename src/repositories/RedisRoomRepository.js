@@ -130,18 +130,26 @@ class RedisRoomRepository {
     }
   }
 
-  async getTotalRooms() {
-    const client = this.getClient();
-    try {
-      const count = await client.scard(this.roomIndexKey);
-      return count || 0;
-    } catch (error) {
-      logger.error('Error al obtener total de salas', {
-        error: error.message,
-      });
-      return 0;
-    }
+async getTotalRooms() {
+  const client = this.getClient();
+  try {
+    // DEBUG: Verifica todas las keys
+    const allKeys = await client.keys('*');
+    console.log(`[DEBUG] Todas las keys en Redis:`, allKeys);
+    
+    const members = await client.smembers(this.roomIndexKey);
+    console.log(`[DEBUG] Members de rooms:index:`, members);
+    
+    const count = await client.scard(this.roomIndexKey);
+    console.log(`[DEBUG] getTotalRooms - roomIndexKey: ${this.roomIndexKey}, count: ${count}`);
+    return count || 0;
+  } catch (error) {
+    logger.error('Error al obtener total de salas', {
+      error: error.message,
+    });
+    return 0;
   }
+}
 
   async getAllRooms() {
     const client = this.getClient();

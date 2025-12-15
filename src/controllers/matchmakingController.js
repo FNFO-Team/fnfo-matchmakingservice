@@ -1,5 +1,6 @@
 /**
  * Controlador REST de Matchmaking
+ * ARCHIVO ACTUALIZADO - Incluye endpoint para unirse a sala por código
  */
 
 const express = require('express');
@@ -45,6 +46,101 @@ router.post(
         ? 'Has salido de la cola de matchmaking'
         : 'No estabas en la cola de matchmaking',
     });
+  })
+);
+
+// ========================================
+// NUEVO: POST /matchmaking/join-room
+// Unirse a una sala existente por código
+// ========================================
+router.post(
+  '/join-room',
+  asyncHandler(async (req, res) => {
+    const { playerId, roomId } = req.body;
+
+    if (!playerId || !roomId) {
+      return res.status(400).json({
+        success: false,
+        error: 'MISSING_PARAMS',
+        message: 'playerId y roomId son requeridos',
+      });
+    }
+
+    logger.debug(`Solicitud de join-room: ${playerId} a sala ${roomId}`);
+
+    try {
+      // Verificar si la sala existe
+      const room = await roomService.getRoomById(roomId);
+
+      if (!room) {
+        return res.status(404).json({
+          success: false,
+          error: 'ROOM_NOT_FOUND',
+          message: `La sala ${roomId} no existe`,
+        });
+      }
+
+      // Verificar si la sala está llena
+      if (room.isFull()) {
+        return res.status(409).json({
+          success: false,
+          error: 'ROOM_FULL',
+          message: 'La sala está llena',
+        });
+      }
+
+      // Verificar si el jugador ya está en la sala
+      if (room.players.includes(playerId)) {
+        return res.status(200).json({
+          success: true,
+          message: 'Ya estás en esta sala',
+          room: RoomResponse.fromGameRoom(room).toJSON(),
+        });
+      }
+
+      // Verificar si la sala está en estado válido para unirse
+      if (room.status !== 'FORMING' && room.status !== 'READY') {
+        return res.status(409).json({
+          success: false,
+          error: 'ROOM_NOT_AVAILABLE',
+          message: 'La sala no está disponible para unirse',
+        });
+      }
+
+      // Agregar jugador a la sala
+      const added = await roomService.addPlayerToRoom(roomId, playerId);
+
+      if (!added) {
+        return res.status(500).json({
+          success: false,
+          error: 'JOIN_FAILED',
+          message: 'No se pudo unir a la sala',
+        });
+      }
+
+      // Obtener sala actualizada
+      const updatedRoom = await roomService.getRoomById(roomId);
+
+      // Publicar notificación de nuevo jugador
+      await matchmakingService.publishRoomNotification(updatedRoom);
+
+      logger.info(`Jugador ${playerId} se unió a sala ${roomId} por código`);
+
+      res.status(200).json({
+        success: true,
+        message: 'Te has unido a la sala',
+        room: RoomResponse.fromGameRoom(updatedRoom).toJSON(),
+      });
+    } catch (error) {
+      if (error.name === 'RoomNotFoundException') {
+        return res.status(404).json({
+          success: false,
+          error: 'ROOM_NOT_FOUND',
+          message: `La sala ${roomId} no existe`,
+        });
+      }
+      throw error;
+    }
   })
 );
 
@@ -117,67 +213,107 @@ router.get(
 // GET /matchmaking/rooms/:roomId
 router.get(
   '/rooms/:roomId',
-  roomIdValidation,
   asyncHandler(async (req, res) => {
     const { roomId } = req.params;
-    const room = await roomService.getRoomById(roomId);
-    const response = RoomResponse.fromGameRoom(room);
-    res.status(200).json(response.toJSON());
+    
+    try {
+      const room = await roomService.getRoomById(roomId);
+      const response = RoomResponse.fromGameRoom(room);
+      res.status(200).json(response.toJSON());
+    } catch (error) {
+      if (error.name === 'RoomNotFoundException') {
+        return res.status(404).json({
+          error: 'ROOM_NOT_FOUND',
+          message: `La sala ${roomId} no existe`,
+        });
+      }
+      throw error;
+    }
   })
 );
 
 // POST /matchmaking/rooms/:roomId/start
 router.post(
   '/rooms/:roomId/start',
-  roomIdValidation,
   asyncHandler(async (req, res) => {
     const { roomId } = req.params;
-    const isReady = await roomService.isRoomReady(roomId);
     
-    if (!isReady) {
-      return res.status(400).json({
-        error: 'ROOM_NOT_READY',
-        message: 'La sala no está lista para comenzar',
+    try {
+      const isReady = await roomService.isRoomReady(roomId);
+      
+      if (!isReady) {
+        return res.status(400).json({
+          error: 'ROOM_NOT_READY',
+          message: 'La sala no está lista para comenzar',
+        });
+      }
+      
+      await roomService.markRoomAsInProgress(roomId);
+      const room = await roomService.getRoomById(roomId);
+      res.status(200).json({
+        success: true,
+        message: 'Partida iniciada',
+        room: RoomResponse.fromGameRoom(room).toJSON(),
       });
+    } catch (error) {
+      if (error.name === 'RoomNotFoundException') {
+        return res.status(404).json({
+          error: 'ROOM_NOT_FOUND',
+          message: `La sala ${roomId} no existe`,
+        });
+      }
+      throw error;
     }
-    
-    await roomService.markRoomAsInProgress(roomId);
-    const room = await roomService.getRoomById(roomId);
-    res.status(200).json({
-      success: true,
-      message: 'Partida iniciada',
-      room: RoomResponse.fromGameRoom(room).toJSON(),
-    });
   })
 );
 
 // POST /matchmaking/rooms/:roomId/finish
 router.post(
   '/rooms/:roomId/finish',
-  roomIdValidation,
   asyncHandler(async (req, res) => {
     const { roomId } = req.params;
-    await roomService.markRoomAsFinished(roomId);
-    const room = await roomService.getRoomById(roomId);
-    res.status(200).json({
-      success: true,
-      message: 'Partida finalizada',
-      room: RoomResponse.fromGameRoom(room).toJSON(),
-    });
+    
+    try {
+      await roomService.markRoomAsFinished(roomId);
+      const room = await roomService.getRoomById(roomId);
+      res.status(200).json({
+        success: true,
+        message: 'Partida finalizada',
+        room: RoomResponse.fromGameRoom(room).toJSON(),
+      });
+    } catch (error) {
+      if (error.name === 'RoomNotFoundException') {
+        return res.status(404).json({
+          error: 'ROOM_NOT_FOUND',
+          message: `La sala ${roomId} no existe`,
+        });
+      }
+      throw error;
+    }
   })
 );
 
 // DELETE /matchmaking/rooms/:roomId
 router.delete(
   '/rooms/:roomId',
-  roomIdValidation,
   asyncHandler(async (req, res) => {
     const { roomId } = req.params;
-    await roomService.deleteRoom(roomId);
-    res.status(200).json({
-      success: true,
-      message: `Sala ${roomId} eliminada`,
-    });
+    
+    try {
+      await roomService.deleteRoom(roomId);
+      res.status(200).json({
+        success: true,
+        message: `Sala ${roomId} eliminada`,
+      });
+    } catch (error) {
+      if (error.name === 'RoomNotFoundException') {
+        return res.status(404).json({
+          error: 'ROOM_NOT_FOUND',
+          message: `La sala ${roomId} no existe`,
+        });
+      }
+      throw error;
+    }
   })
 );
 
